@@ -3,25 +3,24 @@
 import PackageDescription
 import CompilerPluginSupport
 
-let kivy = false
+let kivy = true
 let local = false
-
-let pykit: Package.Dependency = if local {
-    .package(path: "/Volumes/CodeSSD/PythonSwiftGithub/PyKit")
-} else {
-    .package(path: "/Volumes/CodeSSD/PythonSwiftGithub/PyKit")
-}
 
 let pythoncore: Package.Dependency = if kivy {
     .package(url: "https://github.com/KivySwiftLink/PythonCore", .upToNextMajor(from: .init(311, 0, 0)))
 } else {
-    .package(url: "https://github.com/KivySwiftLink/PythonCore", .upToNextMajor(from: .init(311, 0, 0)))
+    .package(url: "https://github.com/PythonSwiftLink/PythonCore", .upToNextMajor(from: .init(311, 0, 0)))
+}
+
+var platforms: [SupportedPlatform] = [.iOS(.v13)]
+
+if !kivy {
+    platforms.append(.macOS(.v11))
 }
 
 let dependencies: [Package.Dependency] = [
-    //.package(url: "https://github.com/KivySwiftLink/PythonCore", .upToNextMajor(from: .init(311, 0, 0))),
+    //.package(url: "https://github.com/PythonSwiftLink/PythonCore", .upToNextMajor(from: .init(311, 0, 0))),
     pythoncore,
-    //pykit,
     .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.1.0"),
     .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0"),
     //.package(url: "https://github.com/PythonSwiftLink/SwiftonizePlugin", .upToNextMajor(from: "0.0.0")),
@@ -31,7 +30,7 @@ let dependencies: [Package.Dependency] = [
 
 let package = Package(
     name: "PySwiftKit",
-    platforms: [.macOS(.v11), .iOS(.v13)],
+    platforms: platforms,
     products: [
         .library(
             name: "PySwiftKit",
@@ -357,6 +356,6 @@ let package = Package(
         //			),
         
         //		.binaryTarget(name: "Python", path: "Sources/Python/Python.xcframework"),
-        //.binaryTarget(name: "Python", url: "https://github.com/KivySwiftLink/PythonCore/releases/download/311.0.2/Python.zip", checksum: "410d57419f0ccbc563ab821e3aa241a4ed8684888775f4bdea0dfc70820b9de6")
+        //.binaryTarget(name: "Python", url: "https://github.com/PythonSwiftLink/PythonCore/releases/download/311.0.2/Python.zip", checksum: "410d57419f0ccbc563ab821e3aa241a4ed8684888775f4bdea0dfc70820b9de6")
     ]
 )
