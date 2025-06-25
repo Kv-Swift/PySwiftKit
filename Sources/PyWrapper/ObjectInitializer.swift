@@ -36,13 +36,17 @@ public class ObjectInitializer {
     
     var parameters: [FunctionParameterSyntax]
     
-    var canThrow: Bool {
-        
+    var funcThrows: Bool {
         if let _ =  decl?.signature.effectSpecifiers?.throwsClause?.throwsSpecifier {
             return true
         }
+        return false
+    }
+    
+    var canThrow: Bool {
+   
         
-        return parameters.canThrow
+        return parameters.count > 0//parameters.canThrow
     }
     
     func process() {
@@ -158,15 +162,30 @@ extension ObjectInitializer {
                             .var,
                             name: .init(stringLiteral: name.text),
                             type: .init(type: parameter.type),
-                            initializer: .init(value: "try PyTuple_GetItem(\(ForceUnwrapExprSyntax(expression: "__arg__".expr).description), 0)".expr)
+                            initializer: .init(value: "try PySwiftKit.PyTuple_GetItem(\(ForceUnwrapExprSyntax(expression: "__arg__".expr).description), 0)".expr)
                         )
                     } else {
-                        VariableDeclSyntax(
-                            .var,
-                            name: .init(stringLiteral: name.text),
-                            type: .init(type: parameter.type),
-                            initializer: .init(value: handleTypes(parameter.type, nil))
-                        )
+                        if parameter.type.isOptPyPointer || parameter.type.isPyPointer {
+                            VariableDeclSyntax(
+                                .var,
+                                name: .init(stringLiteral: name.text),
+                                type: .init(type: parameter.type),
+                                initializer: .init(value: "try PySwiftKit.PyTuple_GetItem(\( ForceUnwrapExprSyntax(expression: "__arg__".expr).description), 0)".expr)
+                            )
+                        } else {
+                            VariableDeclSyntax(
+                                .var,
+                                name: .init(stringLiteral: name.text),
+                                type: .init(type: parameter.type),
+                                initializer: .init(value: "try PySerializing.PyTuple_GetItem(\(ForceUnwrapExprSyntax(expression: "__arg__".expr).description), index: 0)".expr)
+                            )
+                        }
+//                        VariableDeclSyntax(
+//                            .var,
+//                            name: .init(stringLiteral: name.text),
+//                            type: .init(type: parameter.type),
+//                            initializer: .init(value: handleTypes(parameter.type, nil))
+//                        )
                     }
                 }
             default:
@@ -184,7 +203,9 @@ extension ObjectInitializer {
             ReturnStmtSyntax(expression: 0.makeLiteralSyntax())
         }
         return .init {
+            // if @PyInit detected
             if pyInit {
+                // if init or an argument can throw when error  
                 if self.canThrow {
                     DoStmtSyntax(body: .init(statements: code), catchClauses: .standardPyCatchClauses)
                     ReturnStmtSyntax(expression: (-1).makeLiteralSyntax())
@@ -237,7 +258,7 @@ extension ObjectInitializer {
                 for parameter in self.parameters {
                     let name = parameter.secondName ?? parameter.firstName
                     if parameter.type.isPyPointer {
-                        "\(raw: name) = try PyDict_GetItem(kw, \(literal: name.trimmed.text))"
+                        "\(raw: name) = try PySwiftKit.PyDict_GetItem(kw, \(literal: name.trimmed.text))"
                     } else {
                         "\(raw: name) = try PyDict_GetItem<\(raw: parameter.type)>(kw, key: \(literal: name.trimmed.text))"
                     }
@@ -257,7 +278,7 @@ extension ObjectInitializer {
             for (i, parameter) in self.parameters.enumerated() {
                 let name = parameter.secondName ?? parameter.firstName
                 if parameter.type.isPyPointer {
-                    "\(raw: name) = try PyTuple_GetItem(_args_, \(raw: i))"
+                    "\(raw: name) = try PySwiftKit.PyTuple_GetItem(_args_, \(raw: i))"
                 } else {
                     "\(raw: name) = try PyTuple_GetItem<\(raw: parameter.type)>(_args_, index: \(raw: i))"
                 }
@@ -274,12 +295,16 @@ extension IfExprSyntax {
         }
         
         let elseBody = CodeBlockSyntax {
-            "\(raw: key) = try PyDict_GetItem<\(raw: t)>(kw, key: \(literal: key))"
+            if pyPointer {
+                "\(raw: key) = try PyDict_GetItem<\(raw: t)>(kw, \(literal: key))"
+            } else {
+                "\(raw: key) = try PyDict_GetItem<\(raw: t)>(kw, key: \(literal: key))"
+            }
         }
         
         return .init(conditions: if_narg, elseKeyword: .keyword(.else), elseBody: .codeBlock(elseBody)) {
             if pyPointer {
-                "\(raw: key) = try PyTuple_GetItem(_args_, \(raw: index))"
+                "\(raw: key) = try PySwiftKit.PyTuple_GetItem(_args_, \(raw: index))"
             } else {
                 "\(raw: key) = try PyTuple_GetItem<\(raw: t)>(_args_, index: \(raw: index))"
             }
@@ -363,7 +388,7 @@ fileprivate extension ObjectInitializer {
     
     func setPointer() -> SequenceExprSyntax {
         //let _throws_ = __init__?.throws ?? false
-        let _throws_ = canThrow
+        let _throws_ = funcThrows
         let cls_unretained = false
         //let unmanaged = IdentifierExpr(stringLiteral: "Unmanaged")
         let unmanaged = ExprSyntax(stringLiteral: "Unmanaged")
